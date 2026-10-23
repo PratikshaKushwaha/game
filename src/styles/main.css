@@ -14,8 +14,8 @@
   --clr-surface:   #101424;
   --clr-surface-2: #181e35;
   --clr-border:    #2a3556;
-  --clr-accent:    #6366f1;
-  --clr-accent-h:  #818cf8;
+  --clr-accent:    #00e5ff;
+  --clr-accent-h:  #38bdf8;
   --clr-gold:      #fbbf24;
   --clr-red:       #ef4444;
   --clr-cyan:      #06b6d4;
@@ -81,7 +81,7 @@ html, body {
   background: rgba(16, 20, 36, 0.75);
   border: 1px solid var(--clr-border);
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 20px rgba(99,102,241,0.2);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 20px rgba(0,229,255,0.2);
 }
 
 .title-container {
@@ -129,7 +129,7 @@ html, body {
   background: var(--clr-accent);
   border-color: var(--clr-accent-h);
   color: #fff;
-  box-shadow: 0 0 15px rgba(99,102,241,0.5);
+  box-shadow: 0 0 15px rgba(0,229,255,0.4);
   transform: translateY(-2px);
 }
 
@@ -233,7 +233,7 @@ html, body {
   padding: 0.45rem 1.1rem;
   border-radius: 6px;
   font-size: 0.95rem;
-  box-shadow: 0 0 16px rgba(99,102,241,0.4);
+  box-shadow: 0 0 16px rgba(0,229,255,0.4);
 }
 
 .key-hint {
@@ -284,7 +284,7 @@ html, body {
   border: 2px solid var(--clr-accent);
   border-radius: 10px;
   padding: 1.4rem 1.8rem;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 25px rgba(99,102,241,0.3);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 25px rgba(0,229,255,0.3);
   backdrop-filter: blur(6px);
   cursor: pointer;
 }
@@ -365,7 +365,7 @@ kbd { background: #262c45; border: 1px solid #455077; border-radius: 4px; paddin
 }
 .level-card-btn:hover:not(:disabled) {
   border-color: var(--clr-accent);
-  background: rgba(99,102,241,0.25);
+  background: rgba(0,229,255,0.2);
   transform: translateX(4px);
 }
 .level-num { font-weight: bold; color: var(--clr-cyan); }
@@ -381,7 +381,7 @@ kbd { background: #262c45; border: 1px solid #455077; border-radius: 4px; paddin
   background: rgba(16, 20, 36, 0.95);
   border: 2px solid var(--clr-accent);
   border-radius: 12px;
-  box-shadow: 0 0 50px rgba(0,0,0,0.9), 0 0 30px rgba(99,102,241,0.3);
+  box-shadow: 0 0 50px rgba(0,0,0,0.9), 0 0 30px rgba(0,229,255,0.3);
   text-align: center;
 }
 .result-title { font-size: 2.4rem; color: var(--clr-gold); letter-spacing: 0.2em; }

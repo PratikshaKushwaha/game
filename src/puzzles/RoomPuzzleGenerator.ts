@@ -96,7 +96,7 @@ function getLightColor(id: RoomId): number {
     5: 0x00e5ff, // cyan server glow
     6: 0xffd54f, // amber office
     7: 0xff7043, // vault warning orange
-    8: 0xd500f9, // glitch purple core
+    8: 0x00e5ff, // glitch cyan core
   };
   return colors[id] ?? 0xffffff;
 }

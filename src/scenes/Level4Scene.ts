@@ -56,20 +56,20 @@ export class Level4Scene {
   }
 
   private _buildEnvironment(): void {
-    this.scene.fog = new THREE.Fog(0x120824, 15, 60);
-    this.scene.background = new THREE.Color(0x120824);
+    this.scene.fog = new THREE.Fog(0x0a141e, 15, 60);
+    this.scene.background = new THREE.Color(0x0a141e);
 
-    const ambient = new THREE.AmbientLight(0x351f50, 1.4);
+    const ambient = new THREE.AmbientLight(0x142838, 1.4);
     this.scene.add(ambient);
     this.objects.push(ambient);
 
-    const dirLight = new THREE.DirectionalLight(0xb388ff, 1.2);
+    const dirLight = new THREE.DirectionalLight(0x00e5ff, 1.2);
     dirLight.position.set(0, 20, 0);
     this.scene.add(dirLight);
     this.objects.push(dirLight);
 
     // Starting platform
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1f1730, roughness: 0.85 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x111c28, roughness: 0.85 });
     const startPlat = new THREE.Mesh(new THREE.BoxGeometry(10, 0.6, 8), floorMat);
     startPlat.position.set(0, -0.3, 10);
     this.scene.add(startPlat);
@@ -148,15 +148,15 @@ export class Level4Scene {
     // Terminal Base
     const base = new THREE.Mesh(
       new THREE.CylinderGeometry(1.6, 1.8, 0.5, 16),
-      new THREE.MeshStandardMaterial({ color: 0x241d33, roughness: 0.6 })
+      new THREE.MeshStandardMaterial({ color: 0x182430, roughness: 0.6 })
     );
     base.position.y = 0.25;
     this.developerPod.add(base);
 
     // Glowing Containment Cylinder (Imprisoned Developer)
     const podMat = new THREE.MeshStandardMaterial({
-      color: 0x7c4dff,
-      emissive: 0x651fff,
+      color: 0x00b4d8,
+      emissive: 0x00e5ff,
       emissiveIntensity: 0.9,
       transparent: true,
       opacity: 0.7,
@@ -175,7 +175,7 @@ export class Level4Scene {
     this.developerPod.add(figure);
 
     // Beacon Light
-    const light = new THREE.PointLight(0xb388ff, 2.0, 10);
+    const light = new THREE.PointLight(0x00e5ff, 2.0, 10);
     light.position.y = 2.0;
     this.developerPod.add(light);
 
