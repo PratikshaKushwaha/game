@@ -169,6 +169,32 @@ export class BuildingScene {
       this.objects.push(group);
       boxes.push(furnitureColliderBox(group));
     });
+
+    // In Server Room (5) and Vault (7), place the 3D structure artifact from WorldGen pack
+    if ((room.id === 5 || room.id === 7) && this.assets) {
+      const artifact = this.assets.cloneModel('prop-structure');
+      if (artifact) {
+        const diff = this.assets.getTexture('prop-structure-diffuse');
+        artifact.traverse(c => {
+          if (c instanceof THREE.Mesh) {
+            if (diff) {
+              c.material = new THREE.MeshStandardMaterial({
+                map: diff,
+                roughness: 0.65,
+                emissive: 0x004488,
+                emissiveIntensity: 0.4,
+              });
+            }
+            c.castShadow = true;
+            c.receiveShadow = true;
+          }
+        });
+        artifact.position.set(origin.x + 4.5, 0.3, origin.z - 4.5);
+        artifact.scale.set(0.65, 0.65, 0.65);
+        this.scene.add(artifact);
+        this.objects.push(artifact);
+      }
+    }
   }
 
   private _placeClue(room: RoomConfig, origin: THREE.Vector3): void {
@@ -196,6 +222,22 @@ export class BuildingScene {
   private _placeDoor(room: RoomConfig, origin: THREE.Vector3): void {
     const isOdd = room.id % 2 === 1;
     const doorModel = this.assets?.cloneModel('prop-door');
+    if (doorModel) {
+      const diff = this.assets?.getTexture('prop-door-diffuse');
+      doorModel.traverse(c => {
+        if (c instanceof THREE.Mesh) {
+          if (diff) {
+            c.material = new THREE.MeshStandardMaterial({
+              map: diff,
+              roughness: 0.65,
+              metalness: 0.15,
+            });
+          }
+          c.castShadow = true;
+          c.receiveShadow = true;
+        }
+      });
+    }
 
     if (isOdd) {
       // Connects horizontally to adjacent room

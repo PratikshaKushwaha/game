@@ -189,8 +189,8 @@ export class Game {
     this.ui.showHUD();
     this.ui.setRoomLabel('THE HUB — Foggy Void');
 
-    this.player.setPosition(0, 0, 4);
-    this.camCtrl.reset(Math.PI, 0);
+    this.player.setPosition(-0.78, 0, 5.5);
+    this.camCtrl.reset(0, 0);
 
     this.hubScene = new HubScene({
       scene:       this.scene,

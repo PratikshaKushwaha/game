@@ -1,5 +1,5 @@
 // ============================================================
-// HubScene.ts — Foggy Void, Ancient Script, and Teleport Door
+// HubScene.ts — Foggy Void with WorldGen Pack 3D Assets
 // ============================================================
 
 import * as THREE from 'three';
@@ -40,23 +40,24 @@ export class HubScene {
     this.onEnterLevel1 = opts.onEnterLevel1;
 
     this._setupAtmosphere(opts.assets);
+    this._setupWorldGenObjects(opts.assets);
     this._setupDoor(opts.assets);
     this._setupAncientScript();
   }
 
   private _setupAtmosphere(assets?: AssetManager): void {
-    // Quiet, eerie atmosphere with dense fog
+    // Eerie void covered in thick fog
     this.scene.fog = new THREE.FogExp2(0x0a0c14, 0.065);
     this.scene.background = new THREE.Color(0x0a0c14);
 
     // Ambient light
-    const ambient = new THREE.AmbientLight(0x1a2035, 1.2);
+    const ambient = new THREE.AmbientLight(0x222a40, 1.4);
     this.scene.add(ambient);
     this.objects.push(ambient);
 
     // Cold overhead key light
-    const keyLight = new THREE.DirectionalLight(0x7588b5, 0.9);
-    keyLight.position.set(4, 16, 6);
+    const keyLight = new THREE.DirectionalLight(0x7588b5, 1.1);
+    keyLight.position.set(4, 18, 6);
     keyLight.castShadow = true;
     this.scene.add(keyLight);
     this.objects.push(keyLight);
@@ -74,16 +75,18 @@ export class HubScene {
     this.scene.add(ground);
     this.objects.push(ground);
 
-    // Optional WorldGen terrain collider if loaded
+    // ── 3D Environment Scan Mesh from WorldGen pack ──
     if (assets) {
       const worldCollider = assets.cloneModel('world-collider');
       if (worldCollider) {
-        worldCollider.position.set(0, -1.0, -10);
+        worldCollider.position.set(0, -0.2, 0);
         worldCollider.traverse(c => {
           if (c instanceof THREE.Mesh) {
+            c.geometry.computeVertexNormals();
             c.material = new THREE.MeshStandardMaterial({
-              color: 0x0f121d,
-              roughness: 0.95,
+              color: 0x161c2c,
+              roughness: 0.88,
+              metalness: 0.15,
             });
             c.receiveShadow = true;
           }
@@ -94,12 +97,59 @@ export class HubScene {
     }
   }
 
+  private _setupWorldGenObjects(assets?: AssetManager): void {
+    if (!assets) return;
+
+    // ── Object 0001: 3D Structure / Pedestal for Ancient Script ──
+    const prop1 = assets.cloneModel('prop-structure');
+    if (prop1) {
+      const diff1 = assets.getTexture('prop-structure-diffuse');
+      prop1.traverse(c => {
+        if (c instanceof THREE.Mesh) {
+          if (diff1) {
+            c.material = new THREE.MeshStandardMaterial({
+              map: diff1,
+              roughness: 0.65,
+              metalness: 0.2,
+            });
+          }
+          c.castShadow = true;
+          c.receiveShadow = true;
+        }
+      });
+      // Exact transform from transform_matrix.json
+      prop1.position.set(0.814, 0.106, 0.275);
+      prop1.scale.set(0.57, 0.57, 0.57);
+      this.scene.add(prop1);
+      this.objects.push(prop1);
+    }
+  }
+
   private _setupDoor(assets?: AssetManager): void {
+    // ── Object 0000: 3D Door Model from WorldGen pack ──
     const doorModel = assets?.cloneModel('prop-door');
+    if (doorModel) {
+      const diff0 = assets?.getTexture('prop-door-diffuse');
+      doorModel.traverse(c => {
+        if (c instanceof THREE.Mesh) {
+          if (diff0) {
+            c.material = new THREE.MeshStandardMaterial({
+              map: diff0,
+              roughness: 0.6,
+              metalness: 0.2,
+            });
+          }
+          c.castShadow = true;
+          c.receiveShadow = true;
+        }
+      });
+    }
+
     const isUnlocked = gameState.hubScriptRead;
 
+    // Position from transform_matrix.json
     this.door = new Door({
-      position: new THREE.Vector3(0, 0, -6),
+      position: new THREE.Vector3(-0.814, 0, -0.275),
       color: 0x223355,
       locked: !isUnlocked,
       model: doorModel,
@@ -107,9 +157,9 @@ export class HubScene {
     this.scene.add(this.door.root);
     this.objects.push(this.door.root);
 
-    // Portal glow behind door
-    const portalLight = new THREE.PointLight(isUnlocked ? 0x00ffcc : 0xff2200, 1.5, 8);
-    portalLight.position.set(0, 1.5, -6.1);
+    // Glowing teleport aura behind door
+    const portalLight = new THREE.PointLight(isUnlocked ? 0x00ffcc : 0xff2200, 1.8, 8);
+    portalLight.position.set(-0.814, 1.5, -0.35);
     this.scene.add(portalLight);
     this.objects.push(portalLight);
     (this as unknown as Record<string, unknown>)['_portalLight'] = portalLight;
@@ -125,9 +175,9 @@ export class HubScene {
   }
 
   private _setupAncientScript(): void {
-    // Floating on the right side of the door
+    // Floating directly above the structure pedestal at [0.814, 0.106, 0.275]
     this.manuscript = new Manuscript(
-      new THREE.Vector3(2.2, 1.3, -5.2),
+      new THREE.Vector3(0.814, 1.35, 0.275),
       'Read Ancient Script',
       () => this._readScript(),
     );
@@ -140,10 +190,8 @@ export class HubScene {
     this.audio.playOneShot('interact');
     this.audio.playOneShot('glitch');
 
-    // Show manuscript glowing parchment
     this.ui.showManuscript(ENTRANCE_MANUSCRIPT.title, ENTRANCE_MANUSCRIPT.body);
 
-    // Trigger visual-novel narration widget with developer's walkie-talkie voice
     this.ui.showDialogue([
       { speaker: 'DEVELOPER [WALKIE-TALKIE]', text: 'Can you hear me?! You... you are the chosen one! I am trapped inside the game code.' },
       { speaker: 'DEVELOPER [WALKIE-TALKIE]', text: 'The world is broken — corrupted by glitches. To free me, you must clear 4 corrupted sectors.' },
