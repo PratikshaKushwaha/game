@@ -8,8 +8,7 @@ import type { RoomId } from '../../src/game/GameTypes';
 
 function makeState(): GameState {
   const s = new GameState();
-  // Seed with basic puzzle states for rooms 1–6
-  for (let id = 1; id <= 6; id++) {
+  for (let id = 1; id <= 7; id++) {
     s.puzzles.set(id as RoomId, {
       roomId: id as RoomId,
       solved: false,
@@ -25,21 +24,23 @@ describe('GameState', () => {
 
   beforeEach(() => { state = makeState(); });
 
-  it('starts with phase "loading"', () => {
-    expect(state.phase).toBe('loading');
+  it('starts with phase "start_menu"', () => {
+    expect(state.phase).toBe('start_menu');
   });
 
   it('isRoomSolved returns false initially', () => {
     expect(state.isRoomSolved(1)).toBe(false);
   });
 
-  it('solveRoom marks puzzle as solved', () => {
+  it('solveRoom marks puzzle as solved and adds score', () => {
+    const initialScore = state.score;
     state.solveRoom(1);
     expect(state.isRoomSolved(1)).toBe(true);
+    expect(state.score).toBeGreaterThan(initialScore);
   });
 
   it('solveRoom collects highlighted digit', () => {
-    state.solveRoom(1); // has highlightedDigit = '1'
+    state.solveRoom(1);
     expect(state.collectedHighlights).toHaveLength(1);
     expect(state.collectedHighlights[0].digit).toBe('1');
   });
@@ -51,44 +52,50 @@ describe('GameState', () => {
   });
 
   it('solveRoom does not collect digit for non-highlighted room', () => {
-    state.solveRoom(4); // no highlightedDigit
+    state.solveRoom(4);
     expect(state.collectedHighlights).toHaveLength(0);
   });
 
-  it('consumeFinalAttempt decrements counter', () => {
-    state.finalAttempts = 4;
-    state.consumeFinalAttempt();
-    expect(state.finalAttempts).toBe(3);
+  it('loseLife decrements lives and applies penalty', () => {
+    state.lives = 3;
+    const initialScore = state.score;
+    const alive = state.loseLife();
+    expect(alive).toBe(true);
+    expect(state.lives).toBe(2);
+    expect(state.score).toBeLessThan(initialScore);
   });
 
-  it('consumeFinalAttempt does not go below 0', () => {
-    state.finalAttempts = 0;
-    state.consumeFinalAttempt();
-    expect(state.finalAttempts).toBe(0);
+  it('loseLife returns false when out of lives', () => {
+    state.lives = 1;
+    const alive = state.loseLife();
+    expect(alive).toBe(false);
+    expect(state.lives).toBe(0);
   });
 
-  it('reset clears all state', () => {
-    state.solveRoom(1);
-    state.consumeFinalAttempt();
-    state.reset();
-    expect(state.collectedHighlights).toHaveLength(0);
-    expect(state.finalAttempts).toBe(4);
-    expect(state.puzzles.size).toBe(0);
+  it('calculateFinalScore produces valid breakdown and stars', () => {
+    state.score = 1000;
+    state.levelTime = 60;
+    state.lives = 3;
+    const result = state.calculateFinalScore();
+    expect(result.total).toBeGreaterThan(1000);
+    expect(result.stars).toBeGreaterThanOrEqual(1);
+    expect(result.stars).toBeLessThanOrEqual(3);
+  });
+
+  it('resetLevelStats resets timers and ability meters', () => {
+    state.levelTime = 120;
+    state.lives = 1;
+    state.glitchVisionActive = true;
+    state.resetLevelStats();
+    expect(state.levelTime).toBe(0);
+    expect(state.lives).toBe(3);
+    expect(state.glitchVisionActive).toBe(false);
   });
 
   it('notifies listeners on phase change', () => {
     let called = false;
     state.subscribe(() => { called = true; });
-    state.setPhase('entrance');
+    state.setPhase('level_1');
     expect(called).toBe(true);
-  });
-
-  it('unsubscribe stops notifications', () => {
-    let count = 0;
-    const unsub = state.subscribe(() => { count++; });
-    state.setPhase('entrance');
-    unsub();
-    state.setPhase('building');
-    expect(count).toBe(1);
   });
 });

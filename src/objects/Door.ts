@@ -1,5 +1,5 @@
 // ============================================================
-// Door.ts — Procedural door object with open/close animation
+// Door.ts — Door object with procedural and GLTF model support
 // ============================================================
 
 import * as THREE from 'three';
@@ -14,13 +14,14 @@ export interface DoorOptions {
   height?:   number;
   width?:    number;
   locked?:   boolean;
+  model?:    THREE.Object3D;
 }
 
 export class Door {
   readonly root: THREE.Group;
   readonly colliderBox: THREE.Box3;
 
-  private panel:   THREE.Mesh;
+  private panel:   THREE.Object3D;
   private frame:   THREE.Mesh;
   private state:   DoorState;
   private _openAngle   = 0;
@@ -28,7 +29,6 @@ export class Door {
 
   private _mat:       THREE.MeshStandardMaterial;
   private _frameMat:  THREE.MeshStandardMaterial;
-  private _lockedMat: THREE.MeshStandardMaterial;
 
   private _onOpenComplete?: () => void;
 
@@ -49,32 +49,59 @@ export class Door {
     });
     const frameGeo = new THREE.BoxGeometry(W + 0.12, H + 0.12, D + 0.02);
     this.frame = new THREE.Mesh(frameGeo, this._frameMat);
+    this.frame.position.y = H / 2;
     this.frame.receiveShadow = true;
     this.root.add(this.frame);
 
     // ── Door panel — pivot at left edge ─────────────────
-    // The panel group's origin is the left hinge edge
     const pivotGroup = new THREE.Group();
-    pivotGroup.position.x = -W / 2;
+    pivotGroup.position.set(-W / 2, 0, 0);
     this.root.add(pivotGroup);
 
     const panelColor = this.state === 'locked' ? 0x8b1a1a : (opts.color ?? 0x4a3520);
     this._mat = new THREE.MeshStandardMaterial({
       color: panelColor, roughness: 0.7, metalness: 0.15,
-    });
-    this._lockedMat = new THREE.MeshStandardMaterial({
-      color: 0x8b1a1a, roughness: 0.7, metalness: 0.2,
-      emissive: 0x3a0000, emissiveIntensity: 0.4,
+      emissive: this.state === 'locked' ? 0x3a0000 : 0x000000,
+      emissiveIntensity: this.state === 'locked' ? 0.4 : 0,
     });
 
-    const panelGeo = new THREE.BoxGeometry(W, H, D);
-    this.panel = new THREE.Mesh(panelGeo, this._mat);
-    this.panel.position.x = W / 2;   // offset so left edge is at pivot
-    this.panel.castShadow = true;
-    this.panel.receiveShadow = true;
-    this.panel.name = 'door-panel';
-    pivotGroup.add(this.panel);
-    this.panel = this.panel; // keep ref
+    if (opts.model) {
+      // Use supplied 3D GLTF model
+      const modelObj = opts.model;
+      const bBox = new THREE.Box3().setFromObject(modelObj);
+      const size = bBox.getSize(new THREE.Vector3());
+      const scaleY = H / (size.y || 1);
+      const scaleX = W / (size.x || 1);
+      const scaleZ = D / (size.z || 0.1);
+      modelObj.scale.set(scaleX, scaleY, Math.min(scaleZ, scaleX));
+      modelObj.position.set(W / 2, H / 2, 0);
+      modelObj.traverse(child => {
+        if (child instanceof THREE.Mesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      pivotGroup.add(modelObj);
+      this.panel = modelObj;
+    } else {
+      // Procedural door panel
+      const panelGeo = new THREE.BoxGeometry(W, H, D);
+      const mesh = new THREE.Mesh(panelGeo, this._mat);
+      mesh.position.set(W / 2, H / 2, 0);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.name = 'door-panel';
+      pivotGroup.add(mesh);
+      this.panel = mesh;
+
+      // Door handle
+      const handleGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.12, 8);
+      const handleMat = new THREE.MeshStandardMaterial({ color: 0xc0a060, metalness: 0.9, roughness: 0.2 });
+      const handle = new THREE.Mesh(handleGeo, handleMat);
+      handle.rotation.z = Math.PI / 2;
+      handle.position.set(W / 2 - 0.1, 0, D / 2 + 0.04);
+      mesh.add(handle);
+    }
 
     // Store pivot group for animation
     (this as unknown as Record<string, unknown>)['_pivot'] = pivotGroup;
@@ -85,14 +112,6 @@ export class Door {
       new THREE.Vector3(worldPos.x - W / 2 - 0.06, worldPos.y, worldPos.z - D / 2 - 0.01),
       new THREE.Vector3(worldPos.x + W / 2 + 0.06, worldPos.y + H + 0.06, worldPos.z + D / 2 + 0.01),
     );
-
-    // ── Door handle ─────────────────────────────────────
-    const handleGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.12, 8);
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0xc0a060, metalness: 0.9, roughness: 0.2 });
-    const handle = new THREE.Mesh(handleGeo, handleMat);
-    handle.rotation.z = Math.PI / 2;
-    handle.position.set(W / 2 - 0.1, 0, D / 2 + 0.04);
-    this.panel.add(handle);
   }
 
   get isLocked(): boolean { return this.state === 'locked'; }
@@ -103,6 +122,7 @@ export class Door {
       this.state = 'closed';
       this._mat.color.setHex(0x4a3520);
       this._mat.emissiveIntensity = 0;
+      this._applyEmissive(0x000000, 0);
     }
   }
 
@@ -127,15 +147,34 @@ export class Door {
     }
   }
 
-  /** Apply glitch tint for locked rooms. */
+  /** Apply locked tint and highlight */
   setLocked(locked: boolean): void {
     if (locked) {
-      this._mat.copy(this._lockedMat);
       this.state = 'locked';
+      this._applyEmissive(0x3a0000, 0.4);
     } else {
-      this._mat.color.setHex(0x4a3520);
-      this._mat.emissiveIntensity = 0;
+      this.state = 'closed';
+      this._applyEmissive(0x000000, 0);
     }
+  }
+
+  setHighlight(on: boolean): void {
+    if (this.state === 'locked') {
+      this._applyEmissive(on ? 0x660000 : 0x3a0000, on ? 0.7 : 0.4);
+    } else {
+      this._applyEmissive(on ? 0x331100 : 0x000000, on ? 0.4 : 0);
+    }
+  }
+
+  private _applyEmissive(colorHex: number, intensity: number): void {
+    this._mat.emissive.setHex(colorHex);
+    this._mat.emissiveIntensity = intensity;
+    this.panel.traverse(child => {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+        child.material.emissive.setHex(colorHex);
+        child.material.emissiveIntensity = intensity;
+      }
+    });
   }
 
   dispose(): void {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="The Way Out — A GlitchVerse puzzle-adventure game" />
+  <meta name="description" content="The Way Out — A GlitchVerse 3D puzzle-adventure game" />
   <title>The Way Out | GlitchVerse PS01</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/src/styles/main.css" />
@@ -23,7 +23,29 @@
       <div class="loading-bar-container">
         <div class="loading-bar" id="loading-bar"></div>
       </div>
-      <div class="loading-status" id="loading-status">Initializing…</div>
+      <div class="loading-status" id="loading-status">Booting Engine…</div>
+    </div>
+  </div>
+
+  <!-- START MENU OVERLAY -->
+  <div id="start-menu" class="overlay hidden">
+    <div class="start-menu-panel">
+      <div class="title-container">
+        <h1 class="game-main-title glitch-text" data-text="THE WAY OUT">THE WAY OUT</h1>
+        <p class="game-subtitle">GlitchVerse: The World Is Broken</p>
+      </div>
+
+      <nav class="start-menu-nav">
+        <button id="btn-start" class="menu-btn primary-btn">START GAME</button>
+        <button id="btn-continue" class="menu-btn">CONTINUE</button>
+        <button id="btn-level-select" class="menu-btn">LEVEL SELECT</button>
+        <button id="btn-settings" class="menu-btn">SETTINGS</button>
+        <button id="btn-how-to-play" class="menu-btn">HOW TO PLAY</button>
+      </nav>
+
+      <div class="start-menu-footer">
+        <span>Desktop First-Person 3D Adventure • Built with Pure Three.js</span>
+      </div>
     </div>
   </div>
 
@@ -33,28 +55,81 @@
       <source src="/video/opening.mp4" type="video/mp4" />
       <source src="/video/opening.webm" type="video/webm" />
     </video>
-    <button id="cinematic-skip" class="skip-btn" aria-label="Skip cinematic">SKIP ▶</button>
+    <button id="cinematic-skip" class="skip-btn" aria-label="Skip cinematic">SKIP [Space] ▶</button>
   </div>
 
-  <!-- HUD (visible during gameplay) -->
+  <!-- HUD (Visible during gameplay) -->
   <div id="hud" class="hidden">
+    <!-- Top Bar: Score & Timer & Lives -->
+    <div class="hud-top-bar">
+      <div class="hud-stat-box">
+        <span class="hud-label">SCORE</span>
+        <span id="hud-score" class="hud-val">1000</span>
+      </div>
+      <div class="hud-stat-box">
+        <span class="hud-label">TIME</span>
+        <span id="hud-timer" class="hud-val">00:00</span>
+      </div>
+      <div class="hud-stat-box" id="hud-lives-container">
+        <span class="hud-label">LIVES</span>
+        <span id="hud-lives" class="hud-val">❤️❤️❤️</span>
+      </div>
+    </div>
+
+    <!-- Center Room / Level Title -->
+    <div id="room-indicator">
+      <span id="room-label">LEVEL 1: THE ABANDONED BUILDING</span>
+    </div>
+
+    <!-- Crosshair -->
     <div id="crosshair" aria-hidden="true">
       <div class="crosshair-h"></div>
       <div class="crosshair-v"></div>
     </div>
+
+    <!-- Interaction Prompt -->
     <div id="interaction-prompt" class="hidden">
       <span class="key-hint">E</span>
       <span id="interaction-label">Interact</span>
     </div>
-    <div id="room-indicator" class="hidden">
-      <span id="room-label">Room 1</span>
-    </div>
-    <div id="attempt-indicator" class="hidden">
-      <span>Attempts remaining: </span><span id="attempt-count">4</span>
+
+    <!-- Bottom Right: Abilities & Cooldowns -->
+    <div id="hud-abilities" class="hud-abilities">
+      <div id="ability-q" class="ability-card">
+        <span class="ability-key">HOLD [Q]</span>
+        <span class="ability-name">GLITCH VISION</span>
+        <div class="ability-bar-bg"><div id="ability-q-bar" class="ability-bar-fill"></div></div>
+      </div>
+      <div id="ability-f" class="ability-card hidden">
+        <span class="ability-key">[F]</span>
+        <span class="ability-name">GRAVITY FLIP</span>
+      </div>
+      <div id="ability-t" class="ability-card hidden">
+        <span class="ability-key">[T]</span>
+        <span class="ability-name">TIME FREEZE</span>
+        <div class="ability-bar-bg"><div id="ability-t-bar" class="ability-bar-fill"></div></div>
+      </div>
+      <div id="ability-r" class="ability-card hidden">
+        <span class="ability-key">[R]</span>
+        <span class="ability-name">DIMENSION SWITCH</span>
+      </div>
     </div>
   </div>
 
-  <!-- Manuscript overlay -->
+  <!-- VISUAL NOVEL DIALOGUE WIDGET -->
+  <div id="vn-dialogue" class="overlay-dialogue hidden">
+    <div class="dialogue-box">
+      <div class="dialogue-header">
+        <div class="radio-indicator"><span class="radio-dot"></span> <span id="dialogue-speaker">DEVELOPER [WALKIE-TALKIE]</span></div>
+        <span class="dialogue-skip-hint">Click / [E] / [Space] to advance ▶</span>
+      </div>
+      <div class="dialogue-body">
+        <p id="dialogue-text"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manuscript overlay (Ancient Script) -->
   <div id="manuscript-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="manuscript-title">
     <div class="manuscript-panel">
       <div class="manuscript-paper">
@@ -65,7 +140,7 @@
     </div>
   </div>
 
-  <!-- Code entry overlay -->
+  <!-- Code entry overlay (Roblox-style Digital Keypad) -->
   <div id="code-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="code-title">
     <div class="code-panel">
       <h2 id="code-title" class="code-panel-title">Enter Room Code</h2>
@@ -93,11 +168,11 @@
     </div>
   </div>
 
-  <!-- Final combination overlay (room 7) -->
+  <!-- Final combination overlay (Room 8 Lock) -->
   <div id="final-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="final-title">
     <div class="code-panel final-panel">
-      <h2 id="final-title" class="code-panel-title">Final Combination</h2>
-      <p class="final-hint">Enter the three highlighted digits you discovered.</p>
+      <h2 id="final-title" class="code-panel-title">Room 8: Glitch Core Permutation Lock</h2>
+      <p class="final-hint">Enter the 3 highlighted golden digits in the correct sequence.</p>
       <div class="code-display" id="final-display" aria-label="Final combination input">
         <span class="code-digit" data-index="0">_</span>
         <span class="code-digit" data-index="1">_</span>
@@ -118,45 +193,132 @@
         <button class="numpad-btn numpad-submit" data-action="submit">✓</button>
       </div>
       <div id="final-feedback" class="code-feedback hidden" role="alert"></div>
-      <div id="final-attempts" class="attempt-display">Attempts: <span id="final-attempt-count">4</span> / 4</div>
+      <div class="attempt-display">LIVES REMAINING: <span id="final-attempt-count">3</span> / 3</div>
       <button id="final-cancel" class="code-cancel-btn">Cancel [Esc]</button>
     </div>
   </div>
 
-  <!-- Pause menu -->
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="modal-panel">
+      <h2 class="modal-title">SETTINGS</h2>
+      <div class="settings-form">
+        <div class="setting-item">
+          <label for="setting-master">Master Volume (<span id="val-master">80</span>%)</label>
+          <input type="range" id="setting-master" min="0" max="100" value="80" />
+        </div>
+        <div class="setting-item">
+          <label for="setting-music">Music Volume (<span id="val-music">70</span>%)</label>
+          <input type="range" id="setting-music" min="0" max="100" value="70" />
+        </div>
+        <div class="setting-item">
+          <label for="setting-sfx">SFX Volume (<span id="val-sfx">90</span>%)</label>
+          <input type="range" id="setting-sfx" min="0" max="100" value="90" />
+        </div>
+        <div class="setting-item">
+          <label for="setting-sens">Mouse Sensitivity (<span id="val-sens">1.0</span>x)</label>
+          <input type="range" id="setting-sens" min="5" max="30" value="10" />
+        </div>
+      </div>
+      <button id="settings-close" class="menu-btn primary-btn">SAVE & CLOSE</button>
+    </div>
+  </div>
+
+  <!-- HOW TO PLAY MODAL -->
+  <div id="how-to-play-modal" class="overlay hidden" role="dialog" aria-modal="true" aria-label="How to Play">
+    <div class="modal-panel wide-modal">
+      <h2 class="modal-title">HOW TO PLAY</h2>
+      <div class="instructions-content">
+        <h3>Controls</h3>
+        <table class="controls-table">
+          <tr><td><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></td><td>Move player</td></tr>
+          <tr><td><kbd>Shift</kbd> (Hold)</td><td>Sprint</td></tr>
+          <tr><td><kbd>Mouse</kbd></td><td>Look around (Click canvas to lock cursor)</td></tr>
+          <tr><td><kbd>E</kbd></td><td>Interact (Doors, Ancient Script, Clues, Keypads)</td></tr>
+          <tr><td><kbd>Q</kbd> (Hold)</td><td><strong>Glitch Vision</strong> (Level 1 — Reveals hidden digits)</td></tr>
+          <tr><td><kbd>F</kbd></td><td><strong>Gravity Flip</strong> (Level 2 — Reverse gravity to ceiling)</td></tr>
+          <tr><td><kbd>T</kbd></td><td><strong>Time Freeze</strong> (Level 3 — Freeze moving hazards 5s)</td></tr>
+          <tr><td><kbd>R</kbd></td><td><strong>Dimension Switch</strong> (Level 4 — Switch reality layers)</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Pause Menu / Release cursor</td></tr>
+        </table>
+        <h3>Objectives</h3>
+        <p>The game developer is imprisoned inside the GlitchVerse! Clear all 4 levels, solve the corrupted numerical puzzles, and manipulate reality to free him.</p>
+      </div>
+      <button id="how-to-play-close" class="menu-btn primary-btn">BACK</button>
+    </div>
+  </div>
+
+  <!-- LEVEL SELECT MODAL -->
+  <div id="level-select-modal" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Level Select">
+    <div class="modal-panel">
+      <h2 class="modal-title">SELECT SECTOR</h2>
+      <div class="level-grid">
+        <button class="level-card-btn" data-level="1">
+          <span class="level-num">LEVEL 1</span>
+          <span class="level-name">The Abandoned Building</span>
+          <span class="level-stars" id="ls-stars-1">★★★</span>
+        </button>
+        <button class="level-card-btn" data-level="2">
+          <span class="level-num">LEVEL 2</span>
+          <span class="level-name">Gravity Flip</span>
+          <span class="level-stars" id="ls-stars-2">☆☆☆</span>
+        </button>
+        <button class="level-card-btn" data-level="3">
+          <span class="level-num">LEVEL 3</span>
+          <span class="level-name">Time Freeze</span>
+          <span class="level-stars" id="ls-stars-3">☆☆☆</span>
+        </button>
+        <button class="level-card-btn" data-level="4">
+          <span class="level-num">LEVEL 4</span>
+          <span class="level-name">Dimension Switch</span>
+          <span class="level-stars" id="ls-stars-4">☆☆☆</span>
+        </button>
+      </div>
+      <button id="level-select-close" class="menu-btn">BACK</button>
+    </div>
+  </div>
+
+  <!-- Pause Menu -->
   <div id="pause-menu" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Pause Menu">
     <div class="pause-panel">
       <h1 class="pause-title glitch-text" data-text="PAUSED">PAUSED</h1>
       <nav class="pause-nav">
-        <button id="pause-resume" class="pause-btn">Resume</button>
-        <button id="pause-restart" class="pause-btn">Restart Level</button>
+        <button id="pause-resume" class="pause-btn">RESUME</button>
+        <button id="pause-restart" class="pause-btn">RESTART LEVEL</button>
+        <button id="pause-settings" class="pause-btn">SETTINGS</button>
+        <button id="pause-menu-btn" class="pause-btn">MAIN MENU</button>
       </nav>
-      <div class="pause-controls">
-        <h3>Controls</h3>
-        <table>
-          <tr><td>W A S D</td><td>Move</td></tr>
-          <tr><td>Mouse</td><td>Look</td></tr>
-          <tr><td>E</td><td>Interact</td></tr>
-          <tr><td>Esc</td><td>Pause / Release cursor</td></tr>
-        </table>
+    </div>
+  </div>
+
+  <!-- Level Complete Screen -->
+  <div id="level-complete" class="overlay hidden">
+    <div class="result-panel">
+      <h1 class="result-title glitch-text" data-text="SECTOR CLEARED">SECTOR CLEARED</h1>
+      <div class="stars-display" id="result-stars">★★★</div>
+      <div class="result-stats">
+        <div class="stat-row"><span>Time:</span><strong id="result-time">01:45</strong></div>
+        <div class="stat-row"><span>Time Bonus:</span><strong id="result-bonus-time">+290</strong></div>
+        <div class="stat-row"><span>Lives Bonus:</span><strong id="result-bonus-lives">+450</strong></div>
+        <div class="stat-row highlight-row"><span>Total Score:</span><strong id="result-total-score">1,740</strong></div>
+      </div>
+      <div class="result-actions">
+        <button id="btn-next-level" class="menu-btn primary-btn">NEXT LEVEL ▶</button>
+        <button id="btn-level-menu" class="menu-btn">MAIN MENU</button>
       </div>
     </div>
   </div>
 
-  <!-- Level complete screen -->
-  <div id="level-complete" class="overlay hidden">
-    <div class="complete-panel">
-      <h1 class="complete-title glitch-text" data-text="YOU ESCAPED">YOU ESCAPED</h1>
-      <p class="complete-subtitle">The way out… was through the code.</p>
-      <button id="complete-restart" class="pause-btn">Play Again</button>
-    </div>
-  </div>
-
-  <!-- Pointer lock prompt -->
-  <div id="pointer-lock-prompt" class="overlay hidden">
-    <div class="lock-prompt">
-      <p>Click to start / capture mouse</p>
-      <button id="lock-btn" class="pause-btn">Click to Play</button>
+  <!-- Game Won / Free Developer Screen -->
+  <div id="game-won" class="overlay hidden">
+    <div class="victory-panel">
+      <h1 class="victory-title glitch-text" data-text="DEVELOPER FREED">DEVELOPER FREED</h1>
+      <p class="victory-quote">"The loop is broken. We found the way out."</p>
+      <div class="victory-stats">
+        <div><span>TOTAL SCORE:</span> <strong id="won-score">6,420</strong></div>
+        <div><span>TOTAL TIME:</span> <strong id="won-time">08:12</strong></div>
+      </div>
+      <button id="btn-won-restart" class="menu-btn primary-btn">PLAY AGAIN</button>
     </div>
   </div>
 

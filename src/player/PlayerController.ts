@@ -1,5 +1,5 @@
 // ============================================================
-// PlayerController.ts — Movement, pointer lock, and position
+// PlayerController.ts — Movement, Sprint, Pointer Lock, and Physics
 // ============================================================
 
 import * as THREE from 'three';
@@ -7,8 +7,10 @@ import type { InputSystem }    from '../systems/InputSystem';
 import type { CollisionSystem } from './CollisionSystem';
 import type { CameraController } from './CameraController';
 import { CollisionSystem as CS } from './CollisionSystem';
+import { gameState } from '../game/GameState';
 
-const MOVE_SPEED = 5.0; // units per second
+const WALK_SPEED   = 4.8;
+const SPRINT_SPEED = 8.2;
 
 export class PlayerController {
   position: THREE.Vector3 = new THREE.Vector3(0, 0, 5);
@@ -47,7 +49,9 @@ export class PlayerController {
   private _onClick(): void {
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement | null;
     if (!canvas) return;
-    // Only lock when the game is in an interactive phase
+    if (gameState.phase === 'start_menu' || gameState.phase === 'cinematic' || gameState.phase === 'loading') return;
+    if (gameState.isManuscriptOpen || gameState.isCodeEntryOpen || gameState.isFinalEntryOpen || gameState.isSettingsOpen || gameState.isHowToPlayOpen || gameState.isLevelSelectOpen || gameState.isDialogueActive) return;
+
     if (!document.pointerLockElement) {
       canvas.requestPointerLock();
     }
@@ -59,13 +63,16 @@ export class PlayerController {
   }
 
   exitLock(): void {
-    if (document.pointerLockElement) document.exitPointerLock();
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
   }
 
   update(dt: number, blocked: boolean): void {
     if (!this.isLocked || blocked) return;
 
-    const speed = MOVE_SPEED * dt;
+    const baseSpeed = this.input.isSprinting ? SPRINT_SPEED : WALK_SPEED;
+    const speed = baseSpeed * dt;
     const delta = new THREE.Vector3();
 
     if (this.input.moveForward)  delta.addScaledVector(this.camera.getForwardXZ(),  speed);
@@ -73,9 +80,10 @@ export class PlayerController {
     if (this.input.moveRight)    delta.addScaledVector(this.camera.getRightXZ(),    speed);
     if (this.input.moveLeft)     delta.addScaledVector(this.camera.getRightXZ(),   -speed);
 
-    if (delta.lengthSq() === 0) return;
+    if (delta.lengthSq() > 0) {
+      this.position = this.collision.resolve(this.position, delta);
+    }
 
-    this.position = this.collision.resolve(this.position, delta);
     this._syncCameraToPosition();
   }
 
@@ -85,9 +93,11 @@ export class PlayerController {
   }
 
   private _syncCameraToPosition(): void {
+    // If gravity inverted, player head is near ceiling
+    const eyeOffset = gameState.gravityInverted ? (2.8 - CS.EYE_HEIGHT) : CS.EYE_HEIGHT;
     this.camera.camera.position.set(
       this.position.x,
-      this.position.y + CS.EYE_HEIGHT,
+      this.position.y + eyeOffset,
       this.position.z,
     );
   }

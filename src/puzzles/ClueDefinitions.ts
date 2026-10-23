@@ -77,12 +77,19 @@ export const ROOM_MANUSCRIPTS: Record<RoomId, ManuscriptContent> = {
     ],
   },
   7: {
-    title: 'Room 7 — The Exit',
+    title: 'Room 7 — The Maintenance Vault',
     body: [
-      'You made it this far.',
-      'Three digits. That\'s all that stands between you and freedom.',
-      'Enter the combination.',
-      'The way out is waiting.',
+      'Industrial machinery humming in the dark.',
+      'One last room code remains before the Core.',
+      'Check behind the crates and barrels.',
+    ],
+  },
+  8: {
+    title: 'Room 8 — The Glitch Core',
+    body: [
+      'You reached the final security portal.',
+      'Enter the 3 golden highlighted digits in the correct order.',
+      'Careful: 3 failed attempts will trigger a system reboot back to Room 1!',
     ],
   },
 };
@@ -94,5 +101,6 @@ export const CLUE_HINT_TEXT: Record<RoomId, string> = {
   4: 'Numbers scrawled on a notebook cover…',
   5: 'A blinking display on the server rack…',
   6: 'A code written on a desk calendar…',
-  7: 'The final lock panel…',
+  7: 'A stamp on a maintenance crate…',
+  8: 'The final 3-digit permutation lock…',
 };

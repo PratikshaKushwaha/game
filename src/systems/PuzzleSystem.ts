@@ -42,21 +42,19 @@ export class PuzzleSystem {
     return correct;
   }
 
-  /** Try the final 3-digit combination for room 7. */
+  /** Try the final 3-digit combination for Room 8. */
   attemptFinalCode(guess: string, answer: string): 'correct' | 'wrong' | 'lockout' {
-    if (gameState.finalAttempts <= 0) return 'lockout';
+    if (gameState.lives <= 0) return 'lockout';
 
     if (guess === answer) {
-      gameState.finalSolved = true;
-      gameState.notify();
       this.audio.playOneShot('unlock', 1.0);
       return 'correct';
     }
 
-    gameState.consumeFinalAttempt();
+    const hasLives = gameState.loseLife();
     this.audio.playOneShot('fail', 0.8);
 
-    if (gameState.finalAttempts <= 0) return 'lockout';
+    if (!hasLives) return 'lockout';
     return 'wrong';
   }
 
@@ -65,7 +63,7 @@ export class PuzzleSystem {
   }
 
   allRoomsSolved(): boolean {
-    for (let id = 1; id <= 6; id++) {
+    for (let id = 1; id <= 7; id++) {
       if (!gameState.isRoomSolved(id as RoomId)) return false;
     }
     return true;

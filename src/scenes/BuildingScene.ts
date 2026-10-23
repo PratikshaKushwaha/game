@@ -1,5 +1,5 @@
 // ============================================================
-// BuildingScene.ts — Seven-room abandoned building
+// BuildingScene.ts — Level 1: The Abandoned Building (8 Rooms)
 // ============================================================
 
 import * as THREE             from 'three';
@@ -9,7 +9,7 @@ import { Manuscript }                from '../objects/Manuscript';
 import { ClueObject }                from '../objects/ClueObject';
 import { buildFurniture, furnitureColliderBox } from '../objects/Furniture';
 import type { RoomConfig, RoomId }   from '../game/GameTypes';
-import { ROOM_MANUSCRIPTS } from '../puzzles/ClueDefinitions';
+import { ROOM_MANUSCRIPTS }          from '../puzzles/ClueDefinitions';
 import {
   ROOM_SIZE, WALL_THICKNESS,
   getRoomOrigin, getRoomSpawn,
@@ -20,18 +20,21 @@ import type { CollisionSystem }       from '../player/CollisionSystem';
 import type { PlayerController }      from '../player/PlayerController';
 import type { UIManager }             from '../ui/UIManager';
 import type { PuzzleSystem }          from '../systems/PuzzleSystem';
+import type { InputSystem }           from '../systems/InputSystem';
+import type { AudioSystem }           from '../systems/AudioSystem';
+import type { AssetManager }          from '../systems/AssetManager';
 import { FinalCombination }           from '../puzzles/FinalCombination';
 import { gameState }                  from '../game/GameState';
 import { disposeObject }              from '../utils/disposal';
 
 const WALL_MAT = () => new THREE.MeshStandardMaterial({
-  color: 0x1a1a20, roughness: 0.95, metalness: 0.0,
+  color: 0x1b1c24, roughness: 0.95, metalness: 0.05,
 });
 const FLOOR_MAT = () => new THREE.MeshStandardMaterial({
-  color: 0x111115, roughness: 0.9, metalness: 0.0,
+  color: 0x111218, roughness: 0.9, metalness: 0.05,
 });
 const CEIL_MAT = () => new THREE.MeshStandardMaterial({
-  color: 0x0e0e12, roughness: 1.0, metalness: 0.0,
+  color: 0x0c0d12, roughness: 1.0, metalness: 0.0,
 });
 
 export class BuildingScene {
@@ -40,7 +43,7 @@ export class BuildingScene {
   private doors:       Map<RoomId, Door> = new Map();
   private clues:       Map<RoomId, ClueObject> = new Map();
   private manuscripts: Map<RoomId, Manuscript> = new Map();
-  private colliders:   THREE.Box3[] = [];  // kept for debug export
+  private colliders:   THREE.Box3[] = [];
   private finalComb:   FinalCombination;
 
   private interaction: InteractionController;
@@ -48,6 +51,9 @@ export class BuildingScene {
   private player:      PlayerController;
   private ui:          UIManager;
   private puzzle:      PuzzleSystem;
+  private input:       InputSystem;
+  private audio:       AudioSystem;
+  private assets?:     AssetManager;
   private rooms:       RoomConfig[];
   private _currentRoom: RoomId = 1;
   private _onComplete: () => void;
@@ -60,6 +66,9 @@ export class BuildingScene {
     player: PlayerController;
     ui: UIManager;
     puzzle: PuzzleSystem;
+    input: InputSystem;
+    audio: AudioSystem;
+    assets?: AssetManager;
     onComplete: () => void;
   }) {
     this.scene       = opts.scene;
@@ -69,6 +78,9 @@ export class BuildingScene {
     this.player      = opts.player;
     this.ui          = opts.ui;
     this.puzzle      = opts.puzzle;
+    this.input       = opts.input;
+    this.audio       = opts.audio;
+    this.assets      = opts.assets;
     this._onComplete = opts.onComplete;
     this.finalComb   = new FinalCombination(opts.rooms);
 
@@ -78,7 +90,8 @@ export class BuildingScene {
     this._setupUICallbacks();
   }
 
-  // ─── Build all room geometry ────────────────────────────
+  getColliders(): THREE.Box3[] { return this.colliders; }
+
   private _buildAllRooms(): void {
     const allBoxes: THREE.Box3[] = [];
 
@@ -87,14 +100,13 @@ export class BuildingScene {
       this._buildRoomGeometry(room, origin, allBoxes);
       this._placeFurniture(room, origin, allBoxes);
       this._placeClue(room, origin);
-      if (room.id < 7) {
+      if (room.id < 8) {
         this._placeDoor(room, origin);
       }
       this._placeRoomManuscript(room, origin);
     });
 
     this.collision.setObstacles(allBoxes);
-    // Store colliders for reference (used in future debug/export)
     this.colliders = allBoxes;
   }
 
@@ -117,24 +129,20 @@ export class BuildingScene {
     this.scene.add(ceil);
     this.objects.push(ceil);
 
-    // Room light
-    const ptLight = new THREE.PointLight(room.lightColor, room.lightIntensity, 15);
-    ptLight.position.set(cx, h * 0.8, cz);
+    // Atmospheric overhead light
+    const ptLight = new THREE.PointLight(room.lightColor, room.lightIntensity, 16);
+    ptLight.position.set(cx, h * 0.85, cz);
     ptLight.castShadow = true;
     ptLight.shadow.mapSize.set(512, 512);
     this.scene.add(ptLight);
     this.objects.push(ptLight);
 
-    // Walls: north, south, west, east — leaving door gaps on shared walls
+    // Walls
     const wallConfigs = [
-      // South wall (no door hole for room 1 entry)
-      { pos: [cx, h/2, origin.z + T/2],        size: [w, h, T] },
-      // North wall (door hole handled below)
-      { pos: [cx, h/2, origin.z - d - T/2],    size: [w, h, T] },
-      // West wall
-      { pos: [origin.x + T/2, h/2, cz],        size: [T, h, d] },
-      // East wall
-      { pos: [origin.x + w - T/2, h/2, cz],    size: [T, h, d] },
+      { pos: [cx, h/2, origin.z + T/2],     size: [w, h, T] },
+      { pos: [cx, h/2, origin.z - d - T/2], size: [w, h, T] },
+      { pos: [origin.x + T/2, h/2, cz],     size: [T, h, d] },
+      { pos: [origin.x + w - T/2, h/2, cz], size: [T, h, d] },
     ] as { pos: [number,number,number]; size: [number,number,number] }[];
 
     const wMat = WALL_MAT();
@@ -144,8 +152,7 @@ export class BuildingScene {
       wall.castShadow = wall.receiveShadow = true;
       this.scene.add(wall);
       this.objects.push(wall);
-      const box = new THREE.Box3().setFromObject(wall);
-      boxes.push(box);
+      boxes.push(new THREE.Box3().setFromObject(wall));
     });
   }
 
@@ -165,9 +172,9 @@ export class BuildingScene {
   }
 
   private _placeClue(room: RoomConfig, origin: THREE.Vector3): void {
-    if (room.id === 7) return;
+    if (room.id === 8) return;
     const offset = getClueOffset(room.id);
-    const pos    = new THREE.Vector3(
+    const pos = new THREE.Vector3(
       origin.x + offset.x,
       offset.y,
       origin.z - offset.z,
@@ -187,25 +194,18 @@ export class BuildingScene {
   }
 
   private _placeDoor(room: RoomConfig, origin: THREE.Vector3): void {
-    if (room.id === 6) {
-      // Room 6 door leads to room 7 (corridor)
-      const pos = new THREE.Vector3(origin.x + ROOM_SIZE.w / 2, 0, origin.z - ROOM_SIZE.d);
-      const door = new Door({ position: pos, locked: true });
-      this.doors.set(room.id, door);
-      this.scene.add(door.root);
-      this.objects.push(door.root);
+    const isOdd = room.id % 2 === 1;
+    const doorModel = this.assets?.cloneModel('prop-door');
 
-      this.interaction.register({
-        mesh: door.root,
-        info: { type: 'door', label: 'Door to Exit [locked]', roomId: room.id },
-        highlight: (on) => { (door['_mat'] as THREE.MeshStandardMaterial).emissiveIntensity = on ? 0.6 : 0.4; },
-        onInteract: () => this._tryOpenDoor(room.id),
-      });
-    } else if (room.id <= 5 && room.id % 2 === 1) {
-      // Odd rooms 1,3,5 have a connecting door to the next room row
-      // Door on east wall connecting to adjacent room
+    if (isOdd) {
+      // Connects horizontally to adjacent room
       const pos = new THREE.Vector3(origin.x + ROOM_SIZE.w, 0, origin.z - ROOM_SIZE.d / 2);
-      const door = new Door({ position: pos, rotation: Math.PI / 2, locked: !gameState.isRoomSolved(room.id) });
+      const door = new Door({
+        position: pos,
+        rotation: Math.PI / 2,
+        locked: !gameState.isRoomSolved(room.id),
+        model: doorModel,
+      });
       this.doors.set(room.id, door);
       this.scene.add(door.root);
       this.objects.push(door.root);
@@ -213,8 +213,27 @@ export class BuildingScene {
       const targetId = (room.id + 1) as RoomId;
       this.interaction.register({
         mesh: door.root,
-        info: { type: 'door', label: `Door to ${ROOM_MANUSCRIPTS[targetId].title}`, roomId: room.id },
-        highlight: (on) => { (door['_mat'] as THREE.MeshStandardMaterial).emissiveIntensity = on ? 0.4 : (door.isLocked ? 0.4 : 0); },
+        info: { type: 'door', label: `Door to Room ${targetId}`, roomId: room.id },
+        highlight: (on) => door.setHighlight(on),
+        onInteract: () => this._tryOpenDoor(room.id),
+      });
+    } else {
+      // Even room connects down to next tier
+      const pos = new THREE.Vector3(origin.x + ROOM_SIZE.w / 2, 0, origin.z - ROOM_SIZE.d);
+      const door = new Door({
+        position: pos,
+        locked: !gameState.isRoomSolved(room.id),
+        model: doorModel,
+      });
+      this.doors.set(room.id, door);
+      this.scene.add(door.root);
+      this.objects.push(door.root);
+
+      const targetId = (room.id + 1) as RoomId;
+      this.interaction.register({
+        mesh: door.root,
+        info: { type: 'door', label: `Door to Room ${targetId}`, roomId: room.id },
+        highlight: (on) => door.setHighlight(on),
         onInteract: () => this._tryOpenDoor(room.id),
       });
     }
@@ -222,16 +241,20 @@ export class BuildingScene {
 
   private _placeRoomManuscript(room: RoomConfig, origin: THREE.Vector3): void {
     const pos = new THREE.Vector3(
-      origin.x + 1.5,
+      origin.x + 1.8,
       1.3,
-      origin.z - 1.0,
+      origin.z - 1.2,
     );
+    const manuscriptTitle = ROOM_MANUSCRIPTS[room.id]?.title ?? `Room ${room.id} Log`;
     const ms = new Manuscript(
       pos,
-      `Read: ${ROOM_MANUSCRIPTS[room.id].title}`,
+      `Read: ${manuscriptTitle}`,
       () => {
         const content = ROOM_MANUSCRIPTS[room.id];
-        this.ui.showManuscript(content.title, content.body);
+        if (content) {
+          this.audio.playOneShot('interact');
+          this.ui.showManuscript(content.title, content.body);
+        }
       },
     );
     this.scene.add(ms.mesh);
@@ -240,13 +263,12 @@ export class BuildingScene {
     this.interaction.register(ms);
   }
 
-  // ─── Code entry flow ────────────────────────────────────
   private _openCodeEntry(roomId: RoomId): void {
     if (gameState.isRoomSolved(roomId)) {
-      this.ui.showCodeFeedback('Already solved!', true);
+      this.ui.showCodeFeedback('✓ Room code already solved!', true);
       return;
     }
-    if (roomId === 7) {
+    if (roomId === 8) {
       this._openFinalEntry();
       return;
     }
@@ -258,9 +280,8 @@ export class BuildingScene {
   }
 
   private _openFinalEntry(): void {
-    if (gameState.finalAttempts <= 0) {
-      // Restart
-      this._onComplete(); // signal restart
+    if (gameState.lives <= 0) {
+      this._restartToRoom1();
       return;
     }
     gameState.isFinalEntryOpen = true;
@@ -279,7 +300,7 @@ export class BuildingScene {
         this._unlockDoor(roomId);
         this.player.requestLock();
       } else {
-        this.ui.showCodeFeedback('✗ Wrong code. Try again.', false);
+        this.ui.showCodeFeedback('✗ Wrong code. Check room clues with [Q] Glitch Vision!', false);
       }
     };
 
@@ -290,24 +311,29 @@ export class BuildingScene {
     };
 
     this.ui.onFinalSubmit = (guess) => {
-      const result = this.puzzle.attemptFinalCode(guess, this.finalComb.getAnswer());
-      if (result === 'correct') {
-        this.ui.showFinalFeedback('✓ The way out is open!', true);
+      const isCorrect = this.finalComb.check(guess);
+      if (isCorrect) {
+        this.audio.playOneShot('unlock', 1.0);
+        this.ui.showFinalFeedback('✓ CORRECT! Glitch Core Deactivated!', true);
         setTimeout(() => {
           this.ui.hideFinalEntry();
           gameState.isFinalEntryOpen = false;
           this._onComplete();
-        }, 1500);
-      } else if (result === 'lockout') {
-        this.ui.showFinalFeedback('All attempts used. Restarting…', false);
-        setTimeout(() => {
-          this.ui.hideFinalEntry();
-          gameState.isFinalEntryOpen = false;
-          this._onComplete(); // restart
-        }, 2000);
+        }, 1200);
       } else {
-        this.ui.updateFinalAttempts(gameState.finalAttempts);
-        this.ui.showFinalFeedback(`✗ Wrong. ${gameState.finalAttempts} attempt${gameState.finalAttempts === 1 ? '' : 's'} left.`, false);
+        const hasLives = gameState.loseLife();
+        this.audio.playOneShot('fail', 1.0);
+        if (!hasLives) {
+          this.ui.showFinalFeedback('✗ ALL LIVES LOST! Returning to Room 1...', false);
+          setTimeout(() => {
+            this.ui.hideFinalEntry();
+            gameState.isFinalEntryOpen = false;
+            this._restartToRoom1();
+          }, 1800);
+        } else {
+          this.ui.updateFinalAttempts(gameState.lives);
+          this.ui.showFinalFeedback(`✗ Wrong combination! ${gameState.lives} lives remaining.`, false);
+        }
       }
     };
 
@@ -315,6 +341,15 @@ export class BuildingScene {
       gameState.isFinalEntryOpen = false;
       this.player.requestLock();
     };
+  }
+
+  private _restartToRoom1(): void {
+    gameState.restartCount += 1;
+    gameState.applyPenalty(250);
+    gameState.lives = gameState.maxLives;
+    this._spawnInRoom(1);
+    this.player.requestLock();
+    this.ui.showCodeFeedback('Level restarted! Codes have glitched back to room 1.', false);
   }
 
   private _unlockDoor(roomId: RoomId): void {
@@ -326,42 +361,45 @@ export class BuildingScene {
   }
 
   private _tryOpenDoor(roomId: RoomId): void {
-    if (gameState.isRoomSolved(roomId) || roomId === 6) {
-      if (roomId === 6 && !gameState.isRoomSolved(6)) {
-        this.ui.showCodeFeedback('Solve this room first!', false);
-        return;
-      }
+    if (gameState.isRoomSolved(roomId)) {
       const door = this.doors.get(roomId);
       if (door && !door.isOpen) door.open();
     } else {
-      this.ui.showCodeFeedback('Locked — find the code first.', false);
+      this._openCodeEntry(roomId);
     }
   }
 
-  // ─── Player spawn ───────────────────────────────────────
   private _spawnInRoom(id: RoomId): void {
     this._currentRoom = id;
+    gameState.currentRoom = id;
     const spawn = getRoomSpawn(id);
     this.player.setPosition(spawn.x, 0, spawn.z);
     const room = this.rooms.find(r => r.id === id);
     if (room) this.ui.setRoomLabel(room.name);
   }
 
-  // ─── Update ─────────────────────────────────────────────
-  /** Expose collider list for debug/tooling purposes. */
-  getColliders(): THREE.Box3[] { return this.colliders; }
-
   update(dt: number): void {
-    // Update door animations
+    // ── Glitch Vision Mechanic (Hold Q) ──
+    const isHolding = this.input.isHoldingGlitchVision;
+    if (isHolding && gameState.glitchVisionEnergy > 0.05) {
+      gameState.glitchVisionActive = true;
+      gameState.glitchVisionEnergy = Math.max(0, gameState.glitchVisionEnergy - dt * 0.35);
+    } else {
+      gameState.glitchVisionActive = false;
+      gameState.glitchVisionEnergy = Math.min(1.0, gameState.glitchVisionEnergy + dt * 0.25);
+    }
+
+    // Apply Glitch Vision glow to all clue objects
+    this.clues.forEach(c => c.setGlitchVision(gameState.glitchVisionActive));
+
+    // Update doors and manuscripts
     this.doors.forEach(d => d.update(dt));
-    // Update manuscript floats
     this.manuscripts.forEach(m => m.update(dt));
-    // Update clue highlights via interaction system — handled externally
+
     this._checkRoomTransition();
   }
 
   private _checkRoomTransition(): void {
-    // Detect which room the player is in based on position
     const px = this.player.position.x;
     const pz = this.player.position.z;
 
@@ -371,10 +409,8 @@ export class BuildingScene {
       const inZ = pz <= origin.z && pz >= origin.z - ROOM_SIZE.d;
       if (inX && inZ && room.id !== this._currentRoom) {
         this._currentRoom = room.id;
+        gameState.currentRoom = room.id;
         this.ui.setRoomLabel(room.name);
-        if (room.id === 7) {
-          this.ui.setAttempts(gameState.finalAttempts);
-        }
         break;
       }
     }
@@ -389,7 +425,7 @@ export class BuildingScene {
     this.doors.forEach(d => d.dispose());
     this.clues.forEach(c => c.dispose());
     this.manuscripts.forEach(m => m.dispose());
-    this.objects     = [];
+    this.objects = [];
     this.doors.clear();
     this.clues.clear();
     this.manuscripts.clear();

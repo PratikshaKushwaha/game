@@ -5,17 +5,34 @@
 import type { AssetManifest } from '../systems/AssetManager';
 
 export const ASSET_MANIFEST: AssetManifest = {
-  // Textures — optional; game falls back to solid colours if absent
-  // 'concrete-diffuse': { type: 'texture', url: '/textures/concrete_diffuse.jpg' },
-  // 'wood-diffuse':     { type: 'texture', url: '/textures/wood_diffuse.jpg'     },
+  // 3D Environment scan / collider from WorldGen pack
+  'world-collider': {
+    type: 'gltf',
+    url: '/assets/WorldGen/pack/gaussian_splatting/environment_collider.glb',
+  },
 
-  // Models — optional
-  // 'door-model': { type: 'gltf', url: '/models/door.glb' },
+  // 3D Door and prop models from WorldGen pack
+  'prop-door': {
+    type: 'gltf',
+    url: '/assets/WorldGen/pack/separated_objects/glb/object_0000/model_shaded.glb',
+  },
+  'prop-structure': {
+    type: 'gltf',
+    url: '/assets/WorldGen/pack/separated_objects/glb/object_0001/model_shaded.glb',
+  },
 
-  // Audio keys are loaded by AudioSystem separately
+  // Diffuse textures
+  'prop-door-diffuse': {
+    type: 'texture',
+    url: '/assets/WorldGen/pack/separated_objects/glb/object_0000/model_shaded_diffuse.jpg',
+  },
+  'prop-structure-diffuse': {
+    type: 'texture',
+    url: '/assets/WorldGen/pack/separated_objects/glb/object_0001/model_shaded_diffuse.jpg',
+  },
 };
 
-// Audio files that AudioSystem will attempt to load
+// Audio files that AudioSystem will attempt to load; synthesized fallbacks are built in
 export const AUDIO_FILES: Record<string, string> = {
   'ambience': '/audio/ambience.ogg',
   'unlock':   '/audio/unlock.ogg',

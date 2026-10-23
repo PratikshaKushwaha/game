@@ -6,21 +6,21 @@ import { describe, it, expect } from 'vitest';
 import { generateRoomPuzzles, deriveFinalCombination } from '../../src/puzzles/RoomPuzzleGenerator';
 
 describe('generateRoomPuzzles', () => {
-  it('generates exactly 7 rooms', () => {
+  it('generates exactly 8 rooms', () => {
     const rooms = generateRoomPuzzles(42);
-    expect(rooms).toHaveLength(7);
+    expect(rooms).toHaveLength(8);
   });
 
-  it('rooms 1–6 each have a 3-digit code', () => {
+  it('rooms 1–7 each have a 3-digit code', () => {
     const rooms = generateRoomPuzzles(12345);
-    rooms.filter(r => r.id !== 7).forEach(r => {
+    rooms.filter(r => r.id !== 8).forEach(r => {
       expect(r.code).toMatch(/^\d{3}$/);
     });
   });
 
-  it('exactly 3 rooms among 1–6 have a highlighted digit', () => {
+  it('exactly 3 rooms among 1–7 have a highlighted golden digit', () => {
     const rooms = generateRoomPuzzles(99999);
-    const highlighted = rooms.filter(r => r.id !== 7 && r.highlightedDigit !== null);
+    const highlighted = rooms.filter(r => r.id !== 8 && r.highlightedDigit !== null);
     expect(highlighted).toHaveLength(3);
   });
 
@@ -45,15 +45,14 @@ describe('generateRoomPuzzles', () => {
     const b = generateRoomPuzzles(2);
     const codesA = a.map(r => r.code).join('');
     const codesB = b.map(r => r.code).join('');
-    // Extremely unlikely to be identical
     expect(codesA).not.toBe(codesB);
   });
 
-  it('room 7 has no code', () => {
+  it('room 8 (final core) has no code of its own', () => {
     const rooms = generateRoomPuzzles(111);
-    const r7 = rooms.find(r => r.id === 7);
-    expect(r7?.code).toBe('');
-    expect(r7?.highlightedDigit).toBeNull();
+    const r8 = rooms.find(r => r.id === 8);
+    expect(r8?.code).toBe('');
+    expect(r8?.highlightedDigit).toBeNull();
   });
 });
 

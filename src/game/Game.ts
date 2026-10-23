@@ -1,5 +1,5 @@
 // ============================================================
-// Game.ts — Top-level orchestrator for The Way Out
+// Game.ts — Main Engine Orchestrator for The Way Out
 // ============================================================
 
 import * as THREE from 'three';
@@ -8,294 +8,393 @@ import { InputSystem }          from '../systems/InputSystem';
 import { AudioSystem }          from '../systems/AudioSystem';
 import { AssetManager }         from '../systems/AssetManager';
 import { PuzzleSystem }         from '../systems/PuzzleSystem';
+import { SaveSystem }           from '../systems/SaveSystem';
 import { UIManager }            from '../ui/UIManager';
 import { CameraController }     from '../player/CameraController';
 import { PlayerController }     from '../player/PlayerController';
 import { CollisionSystem }      from '../player/CollisionSystem';
 import { InteractionController } from '../player/InteractionController';
+import { StartMenuScene }       from '../scenes/StartMenuScene';
 import { OpeningCinematic }     from '../scenes/OpeningCinematic';
-import { EntranceScene }        from '../scenes/EntranceScene';
+import { HubScene }             from '../scenes/HubScene';
 import { BuildingScene }        from '../scenes/BuildingScene';
+import { Level2Scene }          from '../scenes/Level2Scene';
+import { Level3Scene }          from '../scenes/Level3Scene';
+import { Level4Scene }          from '../scenes/Level4Scene';
 import { generateRoomPuzzles }  from '../puzzles/RoomPuzzleGenerator';
 import { ASSET_MANIFEST, AUDIO_FILES } from '../data/assetManifest';
 
 export class Game {
-  // ── Renderer / camera ───────────────────────────────────
+  // ── Three.js Core ──
   private renderer: THREE.WebGLRenderer;
   private scene:    THREE.Scene;
   private camera:   THREE.PerspectiveCamera;
   private clock:    THREE.Clock;
 
-  // ── Systems ─────────────────────────────────────────────
-  private input:     InputSystem;
-  private audio:     AudioSystem;
-  private assets:    AssetManager;
-  private ui:        UIManager;
-  private camCtrl:   CameraController;
-  private player:    PlayerController;
-  private collision: CollisionSystem;
+  // ── Engine Systems ──
+  private input:       InputSystem;
+  private audio:       AudioSystem;
+  private assets:      AssetManager;
+  private ui:          UIManager;
+  private camCtrl:     CameraController;
+  private player:      PlayerController;
+  private collision:   CollisionSystem;
   private interaction: InteractionController;
-  private puzzle!:   PuzzleSystem;
+  private puzzle?:     PuzzleSystem;
 
-  // ── Active scenes ────────────────────────────────────────
-  private cinematic?:  OpeningCinematic;
-  private entrance?:   EntranceScene;
-  private building?:   BuildingScene;
+  // ── Active Scenes ──
+  private menuScene?:    StartMenuScene;
+  private cinematic?:    OpeningCinematic;
+  private hubScene?:     HubScene;
+  private buildingScene?:BuildingScene;
+  private level2Scene?:  Level2Scene;
+  private level3Scene?:  Level3Scene;
+  private level4Scene?:  Level4Scene;
 
-  // ── Misc ─────────────────────────────────────────────────
   private _animId = 0;
   private _resizeHandler: () => void;
 
   constructor() {
-    // ── Canvas & renderer ───────────────────────────────
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
-    this.renderer.outputColorSpace   = THREE.SRGBColorSpace;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene  = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 200);
     this.clock  = new THREE.Clock();
 
-    // ── Systems ─────────────────────────────────────────
-    this.input     = new InputSystem();
-    this.audio     = new AudioSystem();
-    this.assets    = new AssetManager();
-    this.ui        = new UIManager();
-    this.camCtrl   = new CameraController(this.camera);
-    this.collision = new CollisionSystem();
-    this.player    = new PlayerController(this.input, this.collision, this.camCtrl);
+    this.input       = new InputSystem();
+    this.audio       = new AudioSystem();
+    this.assets      = new AssetManager();
+    this.ui          = new UIManager();
+    this.camCtrl     = new CameraController(this.camera);
+    this.collision   = new CollisionSystem();
+    this.player      = new PlayerController(this.input, this.collision, this.camCtrl);
     this.interaction = new InteractionController(this.camera, this.input);
 
-    // Interaction → HUD hint
-    this.interaction.onHighlightChange = info => this.ui.setInteractionHint(info);
+    this.interaction.onHighlightChange = (info) => this.ui.setInteractionHint(info);
 
-    // ── UI callbacks (pause / restart) ──────────────────
-    this.ui.onPauseResume  = () => this._resume();
-    this.ui.onPauseRestart = () => this._restartLevel();
-    this.ui.onCompleteRestart = () => this._restartLevel();
-    this.ui.onLockRequest  = () => {
-      this.player.requestLock();
-      this.ui.hidePointerLockPrompt();
-    };
+    this._bindUICallbacks();
 
-    // ── Resize ──────────────────────────────────────────
     this._resizeHandler = this._onResize.bind(this);
     window.addEventListener('resize', this._resizeHandler);
 
-    // ── Pointer lock change → show prompt ───────────────
-    document.addEventListener('pointerlockchange', () => {
-      if (!document.pointerLockElement && gameState.phase === 'entrance' || gameState.phase === 'building') {
-        if (!gameState.isManuscriptOpen && !gameState.isCodeEntryOpen && !gameState.isFinalEntryOpen) {
-          // Show unlock prompt briefly
-        }
-      }
-    });
-
-    // ── Asset progress → loading bar ────────────────────
     this.assets.onProgress = (ratio, label) => {
       this.ui.setLoadingProgress(ratio, label);
     };
   }
 
-  // ─── Boot sequence ──────────────────────────────────────
+  private _bindUICallbacks(): void {
+    // Start Menu
+    this.ui.onStartGame = () => {
+      this.audio.unlock();
+      this.ui.hideStartMenu();
+      this._disposeCurrentScene();
+      this._startCinematic();
+    };
+
+    this.ui.onContinueGame = () => {
+      this.audio.unlock();
+      this.ui.hideStartMenu();
+      this._disposeCurrentScene();
+      const targetLvl = gameState.progress.unlockedLevels || 1;
+      this._startLevel(targetLvl);
+    };
+
+    this.ui.onSelectLevel = (level: number) => {
+      this.audio.unlock();
+      this.ui.hideStartMenu();
+      this._disposeCurrentScene();
+      this._startLevel(level);
+    };
+
+    // Pause Menu
+    this.ui.onPauseResume   = () => this._resume();
+    this.ui.onPauseRestart  = () => this._restartCurrentLevel();
+    this.ui.onReturnToMenu  = () => {
+      this.ui.hidePause();
+      this.ui.hideLevelComplete();
+      this.ui.hideGameWon();
+      this._startStartMenu();
+    };
+
+    // Level progression
+    this.ui.onNextLevel = () => {
+      this.ui.hideLevelComplete();
+      const nextLvl = gameState.currentLevel + 1;
+      if (nextLvl <= 4) {
+        this._startLevel(nextLvl);
+      } else {
+        this._triggerGameWon();
+      }
+    };
+  }
+
+  // ─── Engine Boot ─────────────────────────────────────────
   async start(): Promise<void> {
     gameState.setPhase('loading');
 
-    // Generate deterministic puzzles
-    gameState.seed = Date.now();
-    const rooms    = generateRoomPuzzles(gameState.seed);
-
-    // Load assets (tolerates missing files)
-    this.ui.setLoadingProgress(0, 'Loading assets…');
+    this.ui.setLoadingProgress(0.1, 'Loading assets...');
     await this.assets.loadManifest(ASSET_MANIFEST);
 
-    // Load audio (non-blocking)
     Object.entries(AUDIO_FILES).forEach(([key, url]) => {
       this.audio.loadBuffer(key, url);
     });
 
-    this.ui.setLoadingProgress(1, 'Ready');
-    await this._sleep(400);
+    this.ui.setLoadingProgress(1.0, 'Ready');
+    await this._sleep(300);
     this.ui.hideLoading();
 
-    // Try cinematic first
-    this._playCinematic(rooms);
-
-    // Start render loop
+    // Boot into Start Menu
+    this._startStartMenu();
     this._loop();
   }
 
-  // ─── Cinematic ──────────────────────────────────────────
-  private _playCinematic(rooms: ReturnType<typeof generateRoomPuzzles>): void {
+  // ─── Start Menu ──────────────────────────────────────────
+  private _startStartMenu(): void {
+    this._disposeCurrentScene();
+    gameState.setPhase('start_menu');
+    this.player.exitLock();
+    this.ui.showStartMenu();
+
+    this.menuScene = new StartMenuScene(this.scene, this.camera);
+    this.audio.playAmbience('ambience', 0.2);
+  }
+
+  // ─── Opening Cinematic ───────────────────────────────────
+  private _startCinematic(): void {
+    this._disposeCurrentScene();
     gameState.setPhase('cinematic');
     this.ui.showCinematic();
-    this.audio.unlock();
 
     this.cinematic = new OpeningCinematic({
       onComplete: () => {
         this.ui.hideCinematic();
         this.cinematic?.dispose();
         this.cinematic = undefined;
-        this._startEntrance(rooms);
+        this._startHub();
       },
     });
     this.cinematic.play();
   }
 
-  // ─── Entrance scene ─────────────────────────────────────
-  private _startEntrance(rooms: ReturnType<typeof generateRoomPuzzles>): void {
-    gameState.setPhase('entrance');
+  // ─── Hub Scene (After Intro) ─────────────────────────────
+  private _startHub(): void {
+    this._disposeCurrentScene();
+    gameState.setPhase('hub');
     this.ui.showHUD();
+    this.ui.setRoomLabel('THE HUB — Foggy Void');
 
-    // Clear scene
-    this._clearScene();
+    this.player.setPosition(0, 0, 4);
+    this.camCtrl.reset(Math.PI, 0);
 
-    // Player start
-    this.player.setPosition(0, 0, 8);
-    this.camCtrl.reset(Math.PI, 0); // face door (negative Z)
-
-    this.entrance = new EntranceScene({
+    this.hubScene = new HubScene({
       scene:       this.scene,
       interaction: this.interaction,
       ui:          this.ui,
-      onEnterBuilding: () => {
-        this.entrance?.dispose();
-        this.entrance = undefined;
-        this._startBuilding(rooms);
-      },
-    });
-
-    this.player.requestLock();
-  }
-
-  // ─── Building scene ─────────────────────────────────────
-  private _startBuilding(rooms: ReturnType<typeof generateRoomPuzzles>): void {
-    gameState.setPhase('building');
-
-    this._clearScene();
-    this.collision.clearObstacles();
-    this.interaction.clearAll();
-
-    this.puzzle = new PuzzleSystem(rooms, this.audio);
-
-    this.building = new BuildingScene({
-      scene:       this.scene,
-      rooms,
-      interaction: this.interaction,
-      collision:   this.collision,
-      player:      this.player,
-      ui:          this.ui,
-      puzzle:      this.puzzle,
-      onComplete:  () => this._handleLevelEnd(),
+      audio:       this.audio,
+      assets:      this.assets,
+      onEnterLevel1: () => this._startLevel(1),
     });
 
     this.player.requestLock();
     this.audio.playAmbience('ambience', 0.25);
   }
 
-  private _handleLevelEnd(): void {
-    if (gameState.finalSolved) {
-      this._showLevelComplete();
+  // ─── Level Progression Router ────────────────────────────
+  private _startLevel(levelNumber: number): void {
+    this._disposeCurrentScene();
+    gameState.currentLevel = levelNumber;
+    gameState.resetLevelStats();
+    this.ui.showHUD();
+
+    if (levelNumber === 1) {
+      gameState.setPhase('level_1');
+      gameState.seed = Date.now();
+      const rooms = generateRoomPuzzles(gameState.seed);
+      this.puzzle = new PuzzleSystem(rooms, this.audio);
+
+      this.buildingScene = new BuildingScene({
+        scene:       this.scene,
+        rooms,
+        interaction: this.interaction,
+        collision:   this.collision,
+        player:      this.player,
+        ui:          this.ui,
+        puzzle:      this.puzzle,
+        input:       this.input,
+        audio:       this.audio,
+        assets:      this.assets,
+        onComplete:  () => this._handleLevelCleared(1),
+      });
+    } else if (levelNumber === 2) {
+      gameState.setPhase('level_2');
+      this.level2Scene = new Level2Scene({
+        scene:       this.scene,
+        interaction: this.interaction,
+        collision:   this.collision,
+        player:      this.player,
+        ui:          this.ui,
+        input:       this.input,
+        audio:       this.audio,
+        onComplete:  () => this._handleLevelCleared(2),
+      });
+    } else if (levelNumber === 3) {
+      gameState.setPhase('level_3');
+      this.level3Scene = new Level3Scene({
+        scene:       this.scene,
+        interaction: this.interaction,
+        collision:   this.collision,
+        player:      this.player,
+        ui:          this.ui,
+        input:       this.input,
+        audio:       this.audio,
+        onComplete:  () => this._handleLevelCleared(3),
+      });
+    } else if (levelNumber === 4) {
+      gameState.setPhase('level_4');
+      this.level4Scene = new Level4Scene({
+        scene:       this.scene,
+        interaction: this.interaction,
+        collision:   this.collision,
+        player:      this.player,
+        ui:          this.ui,
+        input:       this.input,
+        audio:       this.audio,
+        onComplete:  () => this._handleLevelCleared(4),
+      });
+    }
+
+    this.player.requestLock();
+    this.audio.playAmbience('ambience', 0.3);
+  }
+
+  private _handleLevelCleared(level: number): void {
+    const breakdown = gameState.calculateFinalScore();
+    SaveSystem.recordLevelCompletion(level, gameState.levelTime, breakdown.total, breakdown.stars);
+    gameState.progress = SaveSystem.loadProgress();
+
+    this.player.exitLock();
+    this.audio.playOneShot('unlock', 1.0);
+
+    if (level === 4) {
+      this._triggerGameWon();
     } else {
-      // All attempts used — restart
-      this._restartLevel();
+      gameState.setPhase('level_complete');
+      this.ui.showLevelComplete(gameState.levelTime, breakdown);
     }
   }
 
-  private _showLevelComplete(): void {
-    gameState.setPhase('level_complete');
-    this.audio.stopAmbience();
+  private _triggerGameWon(): void {
+    gameState.setPhase('game_won');
     this.player.exitLock();
-    this.ui.hideHUD();
-    this.ui.showLevelComplete();
+    this._disposeCurrentScene();
+    const finalScore = gameState.score + 1000;
+    this.ui.showGameWon(finalScore, gameState.levelTime);
   }
 
-  // ─── Pause ──────────────────────────────────────────────
+  // ─── Pause & Controls ────────────────────────────────────
   private _pause(): void {
-    if (gameState.phase !== 'entrance' && gameState.phase !== 'building') return;
+    if (gameState.phase === 'start_menu' || gameState.phase === 'cinematic' || gameState.phase === 'paused') return;
     gameState.setPhase('paused');
     this.player.exitLock();
     this.ui.showPause();
   }
 
   private _resume(): void {
-    gameState.setPhase(this.building ? 'building' : 'entrance');
     this.ui.hidePause();
+    if (this.buildingScene) gameState.setPhase('level_1');
+    else if (this.level2Scene) gameState.setPhase('level_2');
+    else if (this.level3Scene) gameState.setPhase('level_3');
+    else if (this.level4Scene) gameState.setPhase('level_4');
+    else if (this.hubScene) gameState.setPhase('hub');
     this.player.requestLock();
   }
 
-  private _restartLevel(): void {
+  private _restartCurrentLevel(): void {
     this.ui.hidePause();
-    this.ui.hideLevelComplete();
-    this.building?.dispose();
-    this.building = undefined;
-    this.audio.stopAmbience();
-    gameState.reset();
-
-    const rooms = generateRoomPuzzles(Date.now());
-    gameState.seed = Date.now();
-    this._startBuilding(rooms);
+    this._startLevel(gameState.currentLevel);
   }
 
-  // ─── Main loop ──────────────────────────────────────────
+  // ─── Main Game Loop (RAF) ────────────────────────────────
   private _loop(): void {
     this._animId = requestAnimationFrame(() => this._loop());
     const dt = Math.min(this.clock.getDelta(), 0.1);
 
-    const blocked =
+    const isUIBlocking =
+      gameState.phase === 'start_menu' ||
+      gameState.phase === 'cinematic' ||
+      gameState.phase === 'paused' ||
+      gameState.phase === 'level_complete' ||
+      gameState.phase === 'game_won' ||
       gameState.isManuscriptOpen ||
-      gameState.isCodeEntryOpen  ||
+      gameState.isCodeEntryOpen ||
       gameState.isFinalEntryOpen ||
-      gameState.phase === 'paused';
+      gameState.isSettingsOpen ||
+      gameState.isHowToPlayOpen ||
+      gameState.isLevelSelectOpen ||
+      gameState.isDialogueActive;
 
-    // Handle pause toggle
+    // Handle Pause Key
     if (this.input.consumePause()) {
       if (gameState.phase === 'paused') {
         this._resume();
-      } else if (gameState.isManuscriptOpen) {
-        this.ui.hideManuscript();
-        gameState.isManuscriptOpen = false;
-        this.player.requestLock();
-      } else if (gameState.isCodeEntryOpen) {
-        this.ui.hideCodeEntry();
-        gameState.isCodeEntryOpen  = false;
-        gameState.activeCodeRoomId = null;
-        this.player.requestLock();
-      } else if (gameState.isFinalEntryOpen) {
-        this.ui.hideFinalEntry();
-        gameState.isFinalEntryOpen = false;
-        this.player.requestLock();
-      } else {
+      } else if (!isUIBlocking) {
         this._pause();
       }
     }
 
+    // Update level timer during active gameplay
+    if (!isUIBlocking && (gameState.phase === 'level_1' || gameState.phase === 'level_2' || gameState.phase === 'level_3' || gameState.phase === 'level_4')) {
+      gameState.levelTime += dt;
+      this.ui.updateHUD(dt);
+    }
+
     // Update active scene
-    this.entrance?.update(dt);
-    this.building?.update(dt);
+    if (this.menuScene) this.menuScene.update(dt);
+    if (this.hubScene) this.hubScene.update(dt);
+    if (this.buildingScene) this.buildingScene.update(dt);
+    if (this.level2Scene) this.level2Scene.update(dt);
+    if (this.level3Scene) this.level3Scene.update(dt);
+    if (this.level4Scene) this.level4Scene.update(dt);
 
-    // Player movement
-    this.player.update(dt, blocked);
+    // Update Player & Camera
+    if (!isUIBlocking) {
+      this.player.update(dt, false);
+      this.camCtrl.update(dt);
+      this.interaction.update(false);
+    }
 
-    // Interaction raycasting
-    this.interaction.update(blocked);
-
-    // Render
+    // Native Three.js Render
     this.renderer.render(this.scene, this.camera);
   }
 
-  // ─── Helpers ────────────────────────────────────────────
-  private _clearScene(): void {
-    // Remove all scene children except core
+  private _disposeCurrentScene(): void {
+    this.menuScene?.dispose();
+    this.menuScene = undefined;
+    this.hubScene?.dispose();
+    this.hubScene = undefined;
+    this.buildingScene?.dispose();
+    this.buildingScene = undefined;
+    this.level2Scene?.dispose();
+    this.level2Scene = undefined;
+    this.level3Scene?.dispose();
+    this.level3Scene = undefined;
+    this.level4Scene?.dispose();
+    this.level4Scene = undefined;
+
+    this.interaction.clearAll();
+    this.collision.clearObstacles();
+
     while (this.scene.children.length > 0) {
       const child = this.scene.children[0];
       this.scene.remove(child);
     }
-    this.scene.fog        = null;
+    this.scene.fog = null;
     this.scene.background = null;
   }
 
@@ -311,11 +410,12 @@ export class Game {
 
   dispose(): void {
     cancelAnimationFrame(this._animId);
+    this._disposeCurrentScene();
     this.input.dispose();
     this.audio.dispose();
     this.assets.dispose();
-    this.camCtrl.dispose();
     this.player.dispose();
+    this.camCtrl.dispose();
     this.renderer.dispose();
     window.removeEventListener('resize', this._resizeHandler);
   }

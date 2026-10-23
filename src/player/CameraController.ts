@@ -1,19 +1,22 @@
 // ============================================================
-// CameraController.ts — First-person look with pointer lock
+// CameraController.ts — First-person Look with Dynamic Sensitivity
 // ============================================================
 
 import * as THREE from 'three';
 import { clamp } from '../utils/math';
+import { gameState } from '../game/GameState';
 
-const LOOK_SENSITIVITY = 0.002;
+const BASE_SENSITIVITY = 0.002;
 const MAX_PITCH_DEG    = 80;
 const MAX_PITCH_RAD    = (MAX_PITCH_DEG * Math.PI) / 180;
 
 export class CameraController {
   readonly camera: THREE.PerspectiveCamera;
 
-  private yaw   = 0;  // radians, horizontal rotation
-  private pitch = 0;  // radians, vertical tilt
+  private yaw   = 0;
+  private pitch = 0;
+  private roll  = 0;
+  private targetRoll = 0;
 
   private _boundMouseMove: (e: MouseEvent) => void;
 
@@ -26,32 +29,38 @@ export class CameraController {
   private _onMouseMove(e: MouseEvent): void {
     if (!document.pointerLockElement) return;
 
-    this.yaw   -= e.movementX * LOOK_SENSITIVITY;
-    this.pitch -= e.movementY * LOOK_SENSITIVITY;
+    const sens = BASE_SENSITIVITY * (gameState.settings.mouseSensitivity || 1.0);
+    this.yaw   -= e.movementX * sens;
+    this.pitch -= e.movementY * sens;
     this.pitch  = clamp(this.pitch, -MAX_PITCH_RAD, MAX_PITCH_RAD);
 
     this._applyRotation();
   }
 
+  update(dt: number): void {
+    // Smooth roll transition for gravity flip (0 rad normal, Math.PI inverted)
+    this.targetRoll = gameState.gravityInverted ? Math.PI : 0;
+    this.roll = THREE.MathUtils.lerp(this.roll, this.targetRoll, dt * 6.0);
+    this._applyRotation();
+  }
+
   private _applyRotation(): void {
-    const euler = new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ');
+    const euler = new THREE.Euler(this.pitch, this.yaw, this.roll, 'YXZ');
     this.camera.quaternion.setFromEuler(euler);
   }
 
-  /** Snap yaw to face a direction (radians from +Z axis). */
   setYaw(yaw: number): void {
     this.yaw = yaw;
     this._applyRotation();
   }
 
-  /** Reset pitch/yaw entirely. */
   reset(yaw = 0, pitch = 0): void {
     this.yaw   = yaw;
     this.pitch = pitch;
+    this.roll  = 0;
     this._applyRotation();
   }
 
-  /** Forward direction in world XZ. */
   getForwardXZ(): THREE.Vector3 {
     const dir = new THREE.Vector3();
     this.camera.getWorldDirection(dir);
@@ -60,7 +69,6 @@ export class CameraController {
     return dir;
   }
 
-  /** Right direction in world XZ. */
   getRightXZ(): THREE.Vector3 {
     const forward = this.getForwardXZ();
     return new THREE.Vector3(forward.z, 0, -forward.x);
