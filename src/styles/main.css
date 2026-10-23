@@ -39,7 +39,7 @@ html, body {
   -webkit-user-select: none;
 }
 
-#game-container {
+#root, #game-container {
   position: fixed;
   inset: 0;
   width: 100vw;

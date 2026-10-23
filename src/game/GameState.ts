@@ -17,9 +17,15 @@ export class GameState {
   seed: number = Date.now();
   puzzles: Map<RoomId, PuzzleState> = new Map();
   collectedHighlights: Array<{ digit: string; roomId: RoomId }> = [];
+  discoveredDigits: Record<number, string> = {};
+  unlockedRooms: number[] = [1];
+  finalAttemptsRemaining: number = 4;
+  finalPermutationSolved: boolean = false;
   lives: number = 3;
   maxLives: number = 3;
   hubScriptRead: boolean = false;
+  levelTimer: number = 0;
+  checkpoint: number = 0;
 
   // ─── Abilities State ────────────────────────────────────
   glitchVisionActive: boolean = false;
@@ -140,6 +146,18 @@ export class GameState {
     this.applyPenalty(50);
     this.notify();
     return this.lives > 0;
+  }
+
+  resetLevel1Run(): void {
+    this.currentRoom = 1;
+    this.puzzles.clear();
+    this.collectedHighlights = [];
+    this.discoveredDigits = {};
+    this.unlockedRooms = [1];
+    this.finalAttemptsRemaining = 4;
+    this.finalPermutationSolved = false;
+    this.resetLevelStats();
+    this.notify();
   }
 
   // ─── Reset ──────────────────────────────────────────────

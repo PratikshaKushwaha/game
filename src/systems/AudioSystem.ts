@@ -215,3 +215,5 @@ export class AudioSystem {
     this.ctx = null;
   }
 }
+
+export const audioSystem = new AudioSystem();

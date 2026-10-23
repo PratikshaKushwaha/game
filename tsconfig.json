@@ -11,6 +11,8 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "noEmit": true,
+    "allowJs": true,
+    "jsx": "react-jsx",
     "types": ["vitest/globals"]
   },
   "include": ["src/**/*", "tests/**/*"],

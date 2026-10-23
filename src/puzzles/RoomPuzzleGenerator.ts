@@ -1,5 +1,5 @@
 // ============================================================
-// RoomPuzzleGenerator.ts — Generates 8-room building puzzles
+// RoomPuzzleGenerator.ts — Generates 7-room building puzzles
 // ============================================================
 
 import type { RoomConfig, RoomId } from '../game/GameTypes';
@@ -12,8 +12,8 @@ const ROOM_NAMES: Record<RoomId, string> = {
   4: 'Room 4 — The Dormitory',
   5: 'Room 5 — The Server Room',
   6: 'Room 6 — The Director\'s Office',
-  7: 'Room 7 — The Maintenance Vault',
-  8: 'Room 8 — The Glitch Core (Exit)',
+  7: 'Room 7 — The Maintenance Vault (Exit)',
+  8: 'Room 8 — Legacy Core',
 };
 
 function generateCode(rng: () => number): string {
@@ -26,12 +26,12 @@ function generateCode(rng: () => number): string {
 export function generateRoomPuzzles(seed: number): RoomConfig[] {
   const rng = createRng(seed);
 
-  // Rooms 1 to 7 have unlock codes
-  const roomIds: RoomId[] = [1, 2, 3, 4, 5, 6, 7];
-  // Exactly 3 rooms out of 1-7 have golden highlighted digits
-  const highlightedRooms = sampleWithout(rng, roomIds, 3) as RoomId[];
+  // Rooms 1 to 6 have standard numerical unlock codes
+  const standardRoomIds: RoomId[] = [1, 2, 3, 4, 5, 6];
+  // Exactly 3 distinct rooms selected from rooms 1–6
+  const highlightedRooms = sampleWithout(rng, standardRoomIds, 3) as RoomId[];
 
-  const rooms: RoomConfig[] = roomIds.map(id => {
+  const rooms: RoomConfig[] = standardRoomIds.map(id => {
     const code = generateCode(rng);
     const isHighlighted = highlightedRooms.includes(id);
 
@@ -61,19 +61,19 @@ export function generateRoomPuzzles(seed: number): RoomConfig[] {
     };
   });
 
-  // Room 8 (The Glitch Core) — final permutation puzzle
+  // Room 7 — Unlocked only by the 3-digit final combination
   rooms.push({
-    id: 8,
-    name: ROOM_NAMES[8],
+    id: 7,
+    name: ROOM_NAMES[7],
     code: '',
     highlightedDigit: null,
     highlightedPosition: null,
     furniture: [],
-    cluePosition: { worldPosition: [0, 1, 0], label: 'Room 8 Final Lock' },
+    cluePosition: { worldPosition: [0, 1, 0], label: 'Room 7 Vault Door' },
     doorConnections: [],
-    lightColor: 0xaa22ff,
+    lightColor: 0x00e5ff,
     lightIntensity: 1.4,
-    ambientNote: 'core',
+    ambientNote: 'vault',
   });
 
   return rooms;

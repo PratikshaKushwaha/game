@@ -14,9 +14,8 @@ export class PuzzleSystem {
     this.audio = audio;
     rooms.forEach(r => this.rooms.set(r.id, r));
 
-    // Initialise puzzle state for rooms 1–6
+    // Initialise puzzle state for rooms 1–7
     rooms.forEach(r => {
-      if (r.id === 7) return;
       gameState.puzzles.set(r.id, {
         roomId: r.id,
         solved: false,
@@ -42,19 +41,37 @@ export class PuzzleSystem {
     return correct;
   }
 
-  /** Try the final 3-digit combination for Room 8. */
-  attemptFinalCode(guess: string, answer: string): 'correct' | 'wrong' | 'lockout' {
-    if (gameState.lives <= 0) return 'lockout';
+  /** 
+   * Try the final 3-digit combination for Room 7.
+   * Exactly 4 valid attempts. Empty/incomplete/invalid format inputs consume NO attempts.
+   * 4th valid wrong attempt triggers Level 1 restart.
+   */
+  attemptFinalCode(guess: string, answer: string): 'invalid_format' | 'correct' | 'wrong' | 'restart' {
+    if (!guess || typeof guess !== 'string') return 'invalid_format';
+    const trimmed = guess.trim();
+    if (trimmed.length !== 3 || !/^\d{3}$/.test(trimmed)) {
+      return 'invalid_format';
+    }
 
-    if (guess === answer) {
+    if (gameState.finalAttemptsRemaining <= 0) {
+      return 'restart';
+    }
+
+    if (trimmed === answer) {
+      gameState.finalPermutationSolved = true;
+      gameState.solveRoom(7 as RoomId);
       this.audio.playOneShot('unlock', 1.0);
       return 'correct';
     }
 
-    const hasLives = gameState.loseLife();
+    // Deduct exactly one attempt
+    gameState.finalAttemptsRemaining = Math.max(0, gameState.finalAttemptsRemaining - 1);
     this.audio.playOneShot('fail', 0.8);
 
-    if (!hasLives) return 'lockout';
+    if (gameState.finalAttemptsRemaining === 0) {
+      return 'restart';
+    }
+
     return 'wrong';
   }
 
