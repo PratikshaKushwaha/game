@@ -10,6 +10,7 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "sourceMap": true,
+    "noEmit": true,
     "types": ["vitest/globals"]
   },
   "include": ["src/**/*", "tests/**/*"],
